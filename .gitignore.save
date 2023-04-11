@@ -1,0 +1,23 @@
+# folder
+wandb/
+__pycache__/
+.ipynb_checkpoints/
+.vscode/
+figure/
+experiments/
+config/
+tmp/
+notebook/
+train_result/
+
+# file type
+*.egg-info
+*.egg
+*.pyc
+*.ipynb
+*.code-workspace
+**/*tmp*
+*.pkl
+test_ilqr_race_car.py
+
+*.avi
