@@ -5,7 +5,7 @@ import os
 import numpy as np
 import jax
 from .dynamics import Bicycle5D
-from .cost import Cost, CollisionChecker, Obstacle
+from .cost import Cost
 from .ref_path import RefPath
 from .config import Config
 import time
