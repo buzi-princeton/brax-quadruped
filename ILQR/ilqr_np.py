@@ -5,7 +5,7 @@ import os
 import numpy as np
 import jax
 from .dynamics import Bicycle5D
-from .cost import Cost, CollisionChecker, Obstacle
+from .cost import Cost
 from .ref_path import RefPath
 from .config import Config
 import time
@@ -34,11 +34,6 @@ class ILQR_np():
 		self.dyn = Bicycle5D(self.config)
 		self.cost = Cost(self.config)
 		self.ref_path = None
-
-		# collision checker
-		# Note: This will not be used until lab2.
-		self.collision_checker = CollisionChecker(self.config)
-		self.obstacle_list = []
 
 		self.warm_up()
 
@@ -82,11 +77,6 @@ class ILQR_np():
 
 		self.ref_path = RefPath(centerline, 0.5, 0.5, 1, True)
 
-		# add obstacle
-		obs = np.array([[0, 0, 0.5, 0.5], [1, 1.5, 1, 1.5]]).T
-		obs_list = [[obs for _ in range(self.T)]]
-		self.update_obstacles(obs_list)
-
 		x_init = np.array([0.0, -1.0, 1, 0, 0])
 		print('Start warm up ILQR...')
 		# import matplotlib.pyplot as plt
@@ -95,7 +85,6 @@ class ILQR_np():
 		# plt.plot(plan['trajectory'][0,:], plan['trajectory'][1,:])
 		# print(f'Warm up takes {plan['t_process']} seconds.')
 		self.ref_path = None
-		self.obstacle_list = []
 
 	def update_ref_path(self, ref_path: RefPath):
 		'''
@@ -105,17 +94,6 @@ class ILQR_np():
 		'''
 		self.ref_path = ref_path
 
-	def update_obstacles(self, vertices_list: list):
-		'''
-		Update the obstacle list for a list of vertices.
-		Args:
-			vertices_list: list of np.ndarray: list of vertices for each obstacle.
-		'''
-		# Note: This will not be used until lab2.
-		self.obstacle_list = []
-		for vertices in vertices_list:
-			self.obstacle_list.append(Obstacle(vertices))
-
 	def get_references(self, trajectory: Union[np.ndarray, DeviceArray]):
 		'''
 		Given the trajectory, get the path reference and obstacle information.
@@ -123,12 +101,10 @@ class ILQR_np():
 			trajectory: [num_dim_x, T] trajectory.
 		Returns:
 			path_refs: [num_dim_x, T] np.ndarray: references.
-			obs_refs: [num_dim_x, T] np.ndarray: obstacle references.
 		'''
 		trajectory = np.asarray(trajectory)
 		path_refs = self.ref_path.get_reference(trajectory[:2, :])
-		obs_refs = self.collision_checker.check_collisions(trajectory, self.obstacle_list)
-		return path_refs, obs_refs
+		return path_refs
 
 	def plan(self, init_state: np.ndarray, 
 				controls: Optional[np.ndarray] = None, verbose=False) -> Dict:
@@ -156,9 +132,9 @@ class ILQR_np():
 		#* from the pyspline.
 		trajectory, controls = self.dyn.rollout_nominal_np(init_state, controls)
 
-		path_refs, obs_refs = self.get_references(trajectory)
+		path_refs = self.get_references(trajectory)
 
-		J = self.cost.get_traj_cost(trajectory, controls, path_refs, obs_refs)
+		J = self.cost.get_traj_cost(trajectory, controls, path_refs)
 
 		converged = False
 		reg = self.reg_init
@@ -303,9 +279,9 @@ class ILQR_np():
 		)
 		path_refs, obs_refs = self.get_references(X)
 		
-		J = self.cost.get_traj_cost(X, U, path_refs, obs_refs)
+		J = self.cost.get_traj_cost(X, U, path_refs)
 		
-		return X, U, J, path_refs, obs_refs
+		return X, U, J, path_refs
 
 	def backward_pass(
 			self, q: np.ndarray, r: np.ndarray, Q: np.ndarray,
@@ -398,11 +374,6 @@ class ILQR_np():
 
 		self.ref_path = RefPath(centerline, 0.5, 0.5, 1, True)
 
-		# add obstacle
-		obs = np.array([[0, 0, 0.5, 0.5], [1, 1.5, 1, 1.5]]).T
-		obs_list = [[obs for _ in range(self.T)]]
-		self.update_obstacles(obs_list)
-
 		x_init = np.array([0.0, -1.0, 1, 0, 0])
 		print("Start warm up ILQR...")
 		# import matplotlib.pyplot as plt
@@ -411,6 +382,5 @@ class ILQR_np():
 		# plt.plot(plan['trajectory'][0,:], plan['trajectory'][1,:])
 		# print(f"Warm up takes {plan['t_process']} seconds.")
 		self.ref_path = None
-		self.obstacle_list = []
 	
 

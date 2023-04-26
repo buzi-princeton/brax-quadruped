@@ -8,7 +8,7 @@ from jax import numpy as jnp
 from jaxlib.xla_extension import DeviceArray
 
 from .dynamics import Bicycle5D
-from .cost import Cost, CollisionChecker, Obstacle
+from .cost import Cost
 from .ref_path import RefPath
 from .config import Config
 import time 
@@ -34,7 +34,6 @@ class ILQR_jax():
 		self.dyn = Bicycle5D(self.config)
 		self.cost = Cost(self.config)
 		self.collision_checker = CollisionChecker(self.config)
-		self.obstacle_list = []
 		self.ref_path = None
 		
 		# ILQR parameters
@@ -65,16 +64,10 @@ class ILQR_jax():
 	def update_ref_path(self, ref_path: RefPath):
 		self.ref_path = ref_path
 
-	def update_obstacles(self, vertices_list: list):
-		self.obstacle_list = []
-		for vertices in vertices_list:
-			self.obstacle_list.append(Obstacle(vertices))
-
 	def get_references(self, trajectory):
 		states_np = np.asarray(trajectory)
 		path_refs = self.ref_path.get_reference(states_np[:2, :])
-		obs_refs = self.collision_checker.check_collisions(states_np, self.obstacle_list)
-		return path_refs, obs_refs
+		return path_refs
 
 	def plan(self, init_state: np.ndarray, 
 				controls: Optional[np.ndarray] = None, verbose=False) -> Dict:
@@ -101,9 +94,9 @@ class ILQR_jax():
 		#* from the pyspline.
 		trajectory, controls = self.dyn.rollout_nominal_jax(init_state, controls)
 
-		path_refs, obs_refs = self.get_references(trajectory)
+		path_refs = self.get_references(trajectory)
 
-		J = self.cost.get_traj_cost(trajectory, controls, path_refs, obs_refs)
+		J = self.cost.get_traj_cost(trajectory, controls, path_refs)
 
 		converged = False
 		reg = self.reg_init
@@ -233,7 +226,7 @@ class ILQR_jax():
 		#* from the pyspline. Thus, it cannot be used with jit.
 		path_refs, obs_refs = self.get_references(X)
 		
-		J = self.cost.get_traj_cost(X, U, path_refs, obs_refs)
+		J = self.cost.get_traj_cost(X, U, path_refs)
 		
 		return X, U, J, path_refs, obs_refs
 
@@ -360,17 +353,11 @@ class ILQR_jax():
 
 		self.ref_path = RefPath(centerline, 0.5, 0.5, 1, True)
 
-		# add obstacle
-		obs = np.array([[0, 0, 0.5, 0.5], [1, 1.5, 1, 1.5]]).T
-		obs_list = [[obs for _ in range(self.T)]]
-		self.update_obstacles(obs_list)
-
 		x_init = np.array([0.0, -1.0, 1, 0, 0])
 		print("Start warm up ILQR...")
 		self.plan(x_init, verbose=False)
 		print("ILQR warm up finished.")
 		
 		self.ref_path = None
-		self.obstacle_list = []
 	
 
